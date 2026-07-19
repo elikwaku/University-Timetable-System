@@ -5,6 +5,7 @@ using UniversityTimetable.Infrastructure.Identity;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Admin/Account")]
     public class AdminAccountController : Controller
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
@@ -16,13 +17,13 @@ namespace UniversityTimetable.Web.Controllers
             _userManager = userManager;
         }
 
-        [HttpGet]
+        [HttpGet("Login")]
         public IActionResult Login()
         {
-            return View();
+            return View("~/Views/AdminAccount/Login.cshtml");
         }
 
-        [HttpPost]
+        [HttpPost("Login")]
         public async Task<IActionResult> Login(string email, string password)
         {
             var user = await _userManager.FindByEmailAsync(email);
@@ -36,9 +37,10 @@ namespace UniversityTimetable.Web.Controllers
             }
 
             ViewBag.Error = "Invalid administrative credentials or insufficient permissions.";
-            return View();
+            return View("~/Views/AdminAccount/Login.cshtml");
         }
 
+        [HttpGet("Logout")]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();

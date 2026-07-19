@@ -11,6 +11,7 @@ using UniversityTimetable.Infrastructure.Services;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Student/[controller]")]
     public class StudentTimetableController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -27,6 +28,8 @@ namespace UniversityTimetable.Web.Controllers
             _exportService = exportService;
         }
 
+        [HttpGet("")]
+        [HttpGet("Index")]
         public async Task<IActionResult> Index()
         {
             var user = await _userManager.GetUserAsync(User);
@@ -66,9 +69,10 @@ namespace UniversityTimetable.Web.Controllers
                 .ToList() ?? new System.Collections.Generic.List<TimetableEntry>();
 
             ViewBag.Timetable = publishedTimetable;
-            return View(studentEntries);
+            return View("~/Views/StudentTimetable/Index.cshtml", studentEntries);
         }
 
+        [HttpGet("ExportPrintHtml")]
         public async Task<IActionResult> ExportPrintHtml()
         {
             var user = await _userManager.GetUserAsync(User);

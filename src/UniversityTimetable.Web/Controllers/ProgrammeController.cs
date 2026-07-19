@@ -6,6 +6,7 @@ using UniversityTimetable.Infrastructure.Data;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Admin/[controller]")]
     public class ProgrammeController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -15,6 +16,8 @@ namespace UniversityTimetable.Web.Controllers
             _context = context;
         }
 
+        [HttpGet("")]
+        [HttpGet("Index")]
         public async Task<IActionResult> Index()
         {
             ViewBag.Departments = await _context.Departments.ToListAsync();
@@ -23,10 +26,10 @@ namespace UniversityTimetable.Web.Controllers
                 .Include(p => p.Courses)
                 .Include(p => p.StudentGroups)
                 .ToListAsync();
-            return View(progs);
+            return View("~/Views/Programme/Index.cshtml", progs);
         }
 
-        [HttpPost]
+        [HttpPost("Create")]
         public async Task<IActionResult> Create(Programme prog)
         {
             if (ModelState.IsValid)
@@ -38,7 +41,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost]
+        [HttpPost("Edit")]
         public async Task<IActionResult> Edit(Programme prog)
         {
             var existing = await _context.Programmes.FindAsync(prog.Id);
@@ -54,7 +57,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost]
+        [HttpPost("Delete")]
         public async Task<IActionResult> Delete(int id)
         {
             var existing = await _context.Programmes.FindAsync(id);

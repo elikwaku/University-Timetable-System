@@ -6,6 +6,7 @@ using UniversityTimetable.Infrastructure.Data;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Admin/[controller]")]
     public class SystemSettingsController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -15,13 +16,15 @@ namespace UniversityTimetable.Web.Controllers
             _context = context;
         }
 
+        [HttpGet("")]
+        [HttpGet("Index")]
         public async Task<IActionResult> Index()
         {
             var settings = await _context.SystemSettings.ToListAsync();
-            return View(settings);
+            return View("~/Views/SystemSettings/Index.cshtml", settings);
         }
 
-        [HttpPost]
+        [HttpPost("SaveSetting")]
         public async Task<IActionResult> SaveSetting(string key, string value)
         {
             var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == key);

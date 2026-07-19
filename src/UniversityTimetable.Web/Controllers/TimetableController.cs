@@ -12,6 +12,7 @@ using UniversityTimetable.Infrastructure.Services;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Admin/[controller]")]
     public class TimetableController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -28,6 +29,8 @@ namespace UniversityTimetable.Web.Controllers
             _exportService = exportService;
         }
 
+        [HttpGet("")]
+        [HttpGet("Index")]
         public async Task<IActionResult> Index()
         {
             var timetables = await _context.Timetables
@@ -41,10 +44,10 @@ namespace UniversityTimetable.Web.Controllers
             ViewBag.ActiveAcademicYear = await _context.AcademicYears.FirstOrDefaultAsync(y => y.IsCurrent);
             ViewBag.ActiveSemester = await _context.Semesters.FirstOrDefaultAsync(s => s.IsActive);
 
-            return View(timetables);
+            return View("~/Views/Timetable/Index.cshtml", timetables);
         }
 
-        [HttpPost]
+        [HttpPost("GenerateAI")]
         public async Task<IActionResult> GenerateAI(int academicYearId, int semesterId, string title, bool regenerateUnlockedOnly = false)
         {
             var year = await _context.AcademicYears.FindAsync(academicYearId);
@@ -127,6 +130,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Editor), new { id = timetable.Id });
         }
 
+        [HttpGet("Editor/{id}")]
         public async Task<IActionResult> Editor(int id)
         {
             var timetable = await _context.Timetables
@@ -147,10 +151,10 @@ namespace UniversityTimetable.Web.Controllers
             ViewBag.Classrooms = await _context.Classrooms.ToListAsync();
             ViewBag.StudentGroups = await _context.StudentGroups.ToListAsync();
 
-            return View(timetable);
+            return View("~/Views/Timetable/Editor.cshtml", timetable);
         }
 
-        [HttpPost]
+        [HttpPost("ToggleLock")]
         public async Task<IActionResult> ToggleLock(int entryId)
         {
             var entry = await _context.TimetableEntries.FindAsync(entryId);
@@ -163,7 +167,7 @@ namespace UniversityTimetable.Web.Controllers
             return Json(new { success = false });
         }
 
-        [HttpPost]
+        [HttpPost("MoveEntry")]
         public async Task<IActionResult> MoveEntry(int entryId, DayOfWeek day, string startTimeStr, int roomId)
         {
             var entry = await _context.TimetableEntries.FindAsync(entryId);
@@ -196,7 +200,7 @@ namespace UniversityTimetable.Web.Controllers
             return Json(new { success = true, clashCount = clashResult.Reports.Count });
         }
 
-        [HttpPost]
+        [HttpPost("Publish")]
         public async Task<IActionResult> Publish(int id)
         {
             var timetable = await _context.Timetables.FindAsync(id);
@@ -210,6 +214,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Editor), new { id });
         }
 
+        [HttpGet("ExportCsv/{id}")]
         public async Task<IActionResult> ExportCsv(int id)
         {
             var timetable = await _context.Timetables
@@ -227,6 +232,7 @@ namespace UniversityTimetable.Web.Controllers
             return File(csvData, "text/csv", $"Timetable_Export_{timetable.Id}.csv");
         }
 
+        [HttpGet("ExportPrintHtml/{id}")]
         public async Task<IActionResult> ExportPrintHtml(int id)
         {
             var timetable = await _context.Timetables

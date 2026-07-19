@@ -4,7 +4,8 @@
 [Ll]og/
 [Ll]ogs/
 *.db
-*.db-journal
+*.db-shm
+*.db-wal
 *.sqlite
 
 ## User-specific files

@@ -11,6 +11,9 @@ using UniversityTimetable.Infrastructure.Identity;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Student")]
+    [Route("Student/Dashboard")]
+    [Route("Student/[controller]")]
     public class StudentDashboardController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -22,6 +25,8 @@ namespace UniversityTimetable.Web.Controllers
             _userManager = userManager;
         }
 
+        [HttpGet("")]
+        [HttpGet("Index")]
         public async Task<IActionResult> Index()
         {
             var user = await _userManager.GetUserAsync(User);
@@ -63,7 +68,7 @@ namespace UniversityTimetable.Web.Controllers
             ViewBag.TodayEntries = todayEntries;
             ViewBag.TotalEnrolledCourses = await _context.Courses.CountAsync(c => c.ProgrammeId == student.ProgrammeId && c.Level == student.Level);
 
-            return View(student);
+            return View("~/Views/StudentDashboard/Index.cshtml", student);
         }
     }
 }

@@ -9,6 +9,7 @@ using UniversityTimetable.Infrastructure.Services;
 
 namespace UniversityTimetable.Web.Controllers
 {
+    [Route("Admin/[controller]")]
     public class StudentGroupController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -20,6 +21,8 @@ namespace UniversityTimetable.Web.Controllers
             _csvImporter = csvImporter;
         }
 
+        [HttpGet("")]
+        [HttpGet("Index")]
         public async Task<IActionResult> Index()
         {
             ViewBag.Programmes = await _context.Programmes.ToListAsync();
@@ -27,10 +30,10 @@ namespace UniversityTimetable.Web.Controllers
                 .Include(g => g.Programme)
                 .Include(g => g.Students)
                 .ToListAsync();
-            return View(groups);
+            return View("~/Views/StudentGroup/Index.cshtml", groups);
         }
 
-        [HttpPost]
+        [HttpPost("Create")]
         public async Task<IActionResult> Create(StudentGroup group)
         {
             _context.StudentGroups.Add(group);
@@ -39,7 +42,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost]
+        [HttpPost("Edit")]
         public async Task<IActionResult> Edit(StudentGroup group)
         {
             var existing = await _context.StudentGroups.FindAsync(group.Id);
@@ -57,7 +60,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost]
+        [HttpPost("Delete")]
         public async Task<IActionResult> Delete(int id)
         {
             var existing = await _context.StudentGroups.FindAsync(id);
@@ -71,7 +74,7 @@ namespace UniversityTimetable.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost]
+        [HttpPost("ImportCsv")]
         public async Task<IActionResult> ImportCsv(IFormFile csvFile)
         {
             if (csvFile == null || csvFile.Length == 0)
@@ -93,7 +96,7 @@ namespace UniversityTimetable.Web.Controllers
 
             var groups = await _context.StudentGroups.Include(g => g.Programme).Include(g => g.Students).ToListAsync();
             ViewBag.Programmes = await _context.Programmes.ToListAsync();
-            return View("Index", groups);
+            return View("~/Views/StudentGroup/Index.cshtml", groups);
         }
     }
 }
