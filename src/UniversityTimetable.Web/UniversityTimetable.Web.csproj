@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\UniversityTimetable.Domain\UniversityTimetable.Domain.csproj" />
+    <ProjectReference Include="..\UniversityTimetable.Core\UniversityTimetable.Core.csproj" />
+    <ProjectReference Include="..\UniversityTimetable.Infrastructure\UniversityTimetable.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

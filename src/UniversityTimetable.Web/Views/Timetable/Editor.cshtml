@@ -1,0 +1,230 @@
+@model UniversityTimetable.Domain.Entities.Timetable
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Interactive Timetable Editor";
+
+    var days = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
+    var timeWindows = new[] {
+        new TimeSpan(8,0,0), new TimeSpan(9,0,0), new TimeSpan(10,0,0), new TimeSpan(11,0,0), new TimeSpan(12,0,0),
+        new TimeSpan(13,0,0), new TimeSpan(14,0,0), new TimeSpan(15,0,0), new TimeSpan(16,0,0)
+    };
+
+    var classrooms = ViewBag.Classrooms as List<UniversityTimetable.Domain.Entities.Classroom> ?? new List<UniversityTimetable.Domain.Entities.Classroom>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h3 class="fw-bold mb-1"><i class="fa-solid fa-calendar-days text-primary me-2"></i>@Model.Title</h3>
+            <span class="badge @(Model.Status == UniversityTimetable.Domain.Enums.TimetableStatus.Published ? "bg-success" : "bg-warning text-dark")">
+                @Model.Status
+            </span>
+        </div>
+        <p class="text-muted mb-0">Interactive Master Schedule | Drag, shift, lock entries, and inspect AI reasoning.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Timetable/ExportPrintHtml/@Model.Id" target="_blank" class="btn btn-outline-secondary">
+            <i class="fa-solid fa-print me-1"></i> Print / PDF View
+        </a>
+        <a href="/Admin/Timetable/ExportCsv/@Model.Id" class="btn btn-outline-success">
+            <i class="fa-solid fa-file-csv me-1"></i> Export CSV
+        </a>
+        @if (Model.Status != UniversityTimetable.Domain.Enums.TimetableStatus.Published)
+        {
+            <form action="/Admin/Timetable/Publish" method="post" class="d-inline">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit" class="btn btn-success fw-semibold"><i class="fa-solid fa-globe me-2"></i>Publish Schedule to Student Portal</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fa-solid fa-circle-check me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Clash Warning Banner -->
+@if (Model.ClashReports != null && Model.ClashReports.Any(c => !c.IsResolved))
+{
+    <div class="alert alert-danger shadow-sm mb-4">
+        <div class="fw-bold fs-6 mb-1"><i class="fa-solid fa-triangle-exclamation me-2"></i>Conflict Warning (@Model.ClashReports.Count(c => !c.IsResolved) Active Clashes Detected)</div>
+        <ul class="mb-0 small">
+            @foreach (var clash in Model.ClashReports.Where(c => !c.IsResolved).Take(3))
+            {
+                <li><strong>[@clash.ConflictType]</strong> @clash.Description — <em>Rec: @clash.Recommendation</em></li>
+            }
+        </ul>
+    </div>
+}
+
+<!-- Weekly Master Grid -->
+<div class="card-custom">
+    <div class="card-header-custom">
+        <h6 class="fw-bold mb-0"><i class="fa-solid fa-table-cells me-2"></i>Weekly Schedule Grid (08:00 - 17:00)</h6>
+        <small class="text-muted"><i class="fa-solid fa-utensils me-1 text-warning"></i>Official Break: 12:30 PM - 1:00 PM Reserved</small>
+    </div>
+    <div class="card-body p-0 overflow-auto">
+        <table class="table table-bordered mb-0 align-middle text-center" style="min-width: 1000px;">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 100px;">Time</th>
+                    @foreach (var day in days)
+                    {
+                        <th>@day.ToString()</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var time in timeWindows)
+                {
+                    bool isBreakTime = (time >= new TimeSpan(12, 0, 0) && time < new TimeSpan(13, 0, 0));
+                    <tr style="@(isBreakTime ? "background-color: #fffbeb;" : "")">
+                        <td class="fw-bold bg-light text-muted small">@time.ToString(@"hh\:mm")</td>
+
+                        @foreach (var day in days)
+                        {
+                            var matchingEntries = Model.Entries?
+                                .Where(e => e.DayOfWeek == day && e.StartTime <= time && e.EndTime > time)
+                                .ToList() ?? new List<UniversityTimetable.Domain.Entities.TimetableEntry>();
+
+                            <td>
+                                @if (isBreakTime && time == new TimeSpan(12, 0, 0))
+                                {
+                                    <div class="badge bg-warning text-dark py-2 px-3 w-100 fw-bold">
+                                        <i class="fa-solid fa-utensils me-1"></i> OFFICIAL DAILY BREAK (12:30 - 13:00)
+                                    </div>
+                                }
+                                else if (matchingEntries.Any())
+                                {
+                                    @foreach (var entry in matchingEntries)
+                                    {
+                                        string bgClass = entry.SessionType == UniversityTimetable.Domain.Enums.SessionType.CombinedClass ? "bg-purple-subtle border-purple text-purple"
+                                            : entry.SessionType == UniversityTimetable.Domain.Enums.SessionType.ComputerLab || entry.SessionType == UniversityTimetable.Domain.Enums.SessionType.Lab ? "bg-success-subtle border-success text-success"
+                                            : "bg-primary-subtle border-primary text-primary";
+
+                                        <div class="card p-2 text-start shadow-sm mb-1 border @bgClass" style="border-left: 4px solid !important;">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <strong class="fs-6">@entry.Course?.Code</strong>
+                                                <button class="btn btn-sm p-0 text-secondary" onclick="toggleLock(@entry.Id, this)">
+                                                    <i class="fa-solid @(entry.IsLocked ? "fa-lock text-danger" : "fa-lock-open")"></i>
+                                                </button>
+                                            </div>
+                                            <div class="small fw-semibold">@entry.Course?.ShortForm</div>
+                                            <div class="small text-muted"><i class="fa-solid fa-door-open me-1"></i>@entry.Classroom?.RoomNumber</div>
+                                            <div class="small text-muted"><i class="fa-solid fa-user me-1"></i>@entry.Lecturer?.FullName</div>
+                                            <div class="mt-1 d-flex justify-content-between align-items-center">
+                                                <span class="badge bg-dark" style="font-size:10px;">@entry.SessionType</span>
+                                                <button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openMoveModal(@entry.Id, '@entry.DayOfWeek', '@entry.StartTime.ToString(@"hh\:mm")', @entry.ClassroomId)">
+                                                    Move <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Move Session Modal -->
+<div class="modal fade" id="moveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-arrows-up-down-left-right me-2"></i>Move Session Slot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="moveEntryId" />
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Target Day of Week</label>
+                    <select id="moveDay" class="form-select">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Start Time Window</label>
+                    <select id="moveStartTime" class="form-select">
+                        <option value="08:00">08:00 AM</option>
+                        <option value="09:00">09:00 AM</option>
+                        <option value="10:00">10:00 AM</option>
+                        <option value="11:00">11:00 AM</option>
+                        <option value="13:00">01:00 PM</option>
+                        <option value="14:00">02:00 PM</option>
+                        <option value="15:00">03:00 PM</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Assign Classroom</label>
+                    <select id="moveRoomId" class="form-select">
+                        @foreach (var r in classrooms)
+                        {
+                            <option value="@r.Id">@r.RoomNumber (@r.RoomType, Cap: @r.Capacity)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-semibold" onclick="submitMove()">Save Shift</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleLock(entryId, btnElement) {
+            $.post('/Admin/Timetable/ToggleLock', { entryId: entryId }, function(res) {
+                if (res.success) {
+                    var icon = $(btnElement).find('i');
+                    if (res.isLocked) {
+                        icon.removeClass('fa-lock-open').addClass('fa-lock text-danger');
+                        toastr.success('Session locked to prevent AI modification.');
+                    } else {
+                        icon.removeClass('fa-lock text-danger').addClass('fa-lock-open');
+                        toastr.info('Session unlocked for AI scheduling.');
+                    }
+                }
+            });
+        }
+
+        function openMoveModal(entryId, day, startTime, roomId) {
+            $('#moveEntryId').val(entryId);
+            $('#moveDay').val(day);
+            $('#moveStartTime').val(startTime);
+            $('#moveRoomId').val(roomId);
+            new bootstrap.Modal(document.getElementById('moveModal')).show();
+        }
+
+        function submitMove() {
+            var data = {
+                entryId: $('#moveEntryId').val(),
+                day: $('#moveDay').val(),
+                startTimeStr: $('#moveStartTime').val(),
+                roomId: $('#moveRoomId').val()
+            };
+
+            $.post('/Admin/Timetable/MoveEntry', data, function(res) {
+                if (res.success) {
+                    toastr.success('Session moved successfully! Real-time clash scan updated.');
+                    location.reload();
+                } else {
+                    toastr.error(res.message || 'Error moving session.');
+                }
+            });
+        }
+    </script>
+}

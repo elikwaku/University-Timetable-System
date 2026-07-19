@@ -1,0 +1,139 @@
+@model IEnumerable<UniversityTimetable.Domain.Entities.Timetable>
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "AI Timetable Studio";
+    var activeYear = ViewBag.ActiveAcademicYear as UniversityTimetable.Domain.Entities.AcademicYear;
+    var activeSem = ViewBag.ActiveSemester as UniversityTimetable.Domain.Entities.Semester;
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>AI Scheduling Studio</h3>
+        <p class="text-muted mb-0">Automate institutional timetable generation using constraint satisfaction, group splitting, and workload optimization.</p>
+    </div>
+    <button class="btn btn-primary fw-semibold btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#generateModal">
+        <i class="fa-solid fa-robot me-2"></i>Generate New AI Timetable
+    </button>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fa-solid fa-circle-check me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card-custom">
+    <div class="card-header-custom">
+        <h6 class="fw-bold mb-0"><i class="fa-solid fa-list-check me-2"></i>Generated Master Timetables</h6>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover datatable">
+            <thead class="table-light">
+                <tr>
+                    <th>Title</th>
+                    <th>Academic Period</th>
+                    <th>Status</th>
+                    <th>Scheduled Entries</th>
+                    <th>Clashes</th>
+                    <th>Created / Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model)
+                {
+                    int clashCount = t.ClashReports?.Count(c => !c.IsResolved) ?? 0;
+                    <tr>
+                        <td class="fw-bold text-primary">@t.Title</td>
+                        <td>@t.AcademicYear?.YearName - Sem @t.Semester?.SemesterNumber</td>
+                        <td>
+                            @switch (t.Status)
+                            {
+                                case UniversityTimetable.Domain.Enums.TimetableStatus.Published:
+                                    <span class="badge bg-success"><i class="fa-solid fa-globe me-1"></i>Published</span>
+                                    break;
+                                case UniversityTimetable.Domain.Enums.TimetableStatus.Validated:
+                                    <span class="badge bg-info text-white"><i class="fa-solid fa-circle-check me-1"></i>Conflict-Free</span>
+                                    break;
+                                default:
+                                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-pen me-1"></i>Draft / Revision</span>
+                                    break;
+                            }
+                        </td>
+                        <td><span class="badge bg-dark fs-6">@t.Entries.Count Sessions</span></td>
+                        <td>
+                            @if (clashCount > 0)
+                            {
+                                <span class="badge bg-danger text-white"><i class="fa-solid fa-triangle-exclamation me-1"></i>@clashCount Clashes</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-check me-1"></i>0 Clashes</span>
+                            }
+                        </td>
+                        <td><small class="text-muted">@t.UpdatedAt?.ToString("MMM dd, yyyy HH:mm")</small></td>
+                        <td>
+                            <a href="/Admin/Timetable/Editor/@t.Id" class="btn btn-sm btn-primary fw-semibold me-1">
+                                <i class="fa-solid fa-grid-2-plus me-1"></i>Open Interactive Grid
+                            </a>
+                            <a href="/Admin/Timetable/ExportPrintHtml/@t.Id" target="_blank" class="btn btn-sm btn-outline-secondary me-1">
+                                <i class="fa-solid fa-print"></i>
+                            </a>
+                            <a href="/Admin/Timetable/ExportCsv/@t.Id" class="btn btn-sm btn-outline-success">
+                                <i class="fa-solid fa-file-csv"></i>
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Generate AI Timetable Modal -->
+<div class="modal fade" id="generateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <form action="/Admin/Timetable/GenerateAI" method="post">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-robot me-2"></i>AI Timetable Generator Studio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small mb-3">
+                        <i class="fa-solid fa-circle-info me-1"></i> The AI Engine will partition courses into 1h and 2h blocks, reserve the 30-min official break, match computer/science labs, auto-split groups, and schedule combined classes.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Timetable Title</label>
+                        <input type="text" name="title" class="form-control" value="Master Timetable 2025/2026 Sem 1" required />
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Academic Year</label>
+                            <input type="hidden" name="academicYearId" value="@(activeYear?.Id ?? 1)" />
+                            <input type="text" class="form-control" value="@(activeYear?.YearName ?? "2025/2026")" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Semester</label>
+                            <input type="hidden" name="semesterId" value="@(activeSem?.Id ?? 1)" />
+                            <input type="text" class="form-control" value="Semester @(activeSem?.SemesterNumber ?? 1)" readonly />
+                        </div>
+                    </div>
+                    <div class="form-check p-3 bg-light rounded border">
+                        <input type="checkbox" name="regenerateUnlockedOnly" value="true" class="form-check-input" id="regenLock">
+                        <label class="form-check-label fw-semibold" for="regenLock">
+                            Partial Regeneration (Preserve Locked Sessions)
+                        </label>
+                        <div class="text-muted small">When checked, sessions marked as 'Locked' in the editor will remain fixed, and only unlocked sessions will be re-scheduled.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Run AI Generation Engine</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

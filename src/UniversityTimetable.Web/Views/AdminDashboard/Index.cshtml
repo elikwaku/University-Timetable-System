@@ -1,0 +1,169 @@
+@model IEnumerable<UniversityTimetable.Domain.Entities.AISchedulingLog>
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Executive Dashboard";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="fa-solid fa-gauge-high text-primary me-2"></i>Executive Timetable Dashboard</h3>
+        <p class="text-muted mb-0">Overview of institutional data, AI scheduling engine activity, and classroom utilization.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Timetable" class="btn btn-primary fw-semibold"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Launch AI Generator Studio</a>
+    </div>
+</div>
+
+<!-- KPI Cards Grid -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-primary-subtle text-primary"><i class="fa-solid fa-building-columns"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">DEPARTMENTS</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalDepartments</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-info-subtle text-info"><i class="fa-solid fa-book-bookmark"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">PROGRAMMES</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalProgrammes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-success-subtle text-success"><i class="fa-solid fa-book-open"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">ACTIVE COURSES</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalCourses</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-warning-subtle text-warning"><i class="fa-solid fa-door-open"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">CLASSROOMS & LABS</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalClassrooms</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-secondary-subtle text-secondary"><i class="fa-solid fa-user-tie"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">LECTURERS</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalLecturers</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-purple-subtle text-purple" style="background:#f3e8ff; color:#9333ea;"><i class="fa-solid fa-users"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">STUDENTS</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalStudents</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-teal-subtle text-teal" style="background:#ccfbf1; color:#0d9488;"><i class="fa-solid fa-calendar-check"></i></div>
+            <div>
+                <div class="text-muted small fw-semibold">SCHEDULED SESSIONS</div>
+                <div class="fs-3 fw-bold">@ViewBag.TotalScheduledEntries</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon @(ViewBag.TotalClashes > 0 ? "bg-danger-subtle text-danger" : "bg-success-subtle text-success")">
+                <i class="fa-solid @(ViewBag.TotalClashes > 0 ? "fa-triangle-exclamation" : "fa-shield-check")"></i>
+            </div>
+            <div>
+                <div class="text-muted small fw-semibold">ACTIVE CLASHES</div>
+                <div class="fs-3 fw-bold @(ViewBag.TotalClashes > 0 ? "text-danger" : "text-success")">@ViewBag.TotalClashes</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts & AI Log Feed -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card-custom h-100">
+            <div class="card-header-custom">
+                <h6 class="fw-bold mb-0"><i class="fa-solid fa-chart-pie me-2 text-primary"></i>Classroom Inventory & Capacity</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="roomChart" style="max-height: 280px;"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card-custom h-100">
+            <div class="card-header-custom">
+                <h6 class="fw-bold mb-0"><i class="fa-solid fa-brain me-2 text-info"></i>AI Scheduling Activity Feed</h6>
+                <span class="badge bg-info-subtle text-info">Live Rationale</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var log in Model)
+                        {
+                            <div class="list-group-item p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge bg-secondary fw-semibold">@log.StepName</span>
+                                    <small class="text-muted">@log.Timestamp.ToString("HH:mm:ss")</small>
+                                </div>
+                                <div class="fw-semibold text-dark small">@log.Rationale</div>
+                                <div class="text-muted small mt-1" style="white-space: pre-line;">@log.Details</div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-4 text-center text-muted">
+                            <i class="fa-solid fa-robot fa-2x mb-2 opacity-50"></i>
+                            <p class="mb-0">No AI scheduling logs recorded yet. Run the AI Generator to see step-by-step reasoning!</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        var roomData = @Html.Raw(ViewBag.RoomTypesJson ?? "[]");
+        var labels = roomData.map(d => d.RoomType);
+        var counts = roomData.map(d => d.Count);
+
+        var ctx = document.getElementById('roomChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: ['#0284c7', '#10b981', '#f59e0b', '#8b5cf6']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    </script>
+}

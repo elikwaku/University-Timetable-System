@@ -1,0 +1,278 @@
+@model IEnumerable<UniversityTimetable.Domain.Entities.Course>
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Course Catalog";
+    var departments = ViewBag.Departments as List<UniversityTimetable.Domain.Entities.Department> ?? new List<UniversityTimetable.Domain.Entities.Department>();
+    var programmes = ViewBag.Programmes as List<UniversityTimetable.Domain.Entities.Programme> ?? new List<UniversityTimetable.Domain.Entities.Programme>();
+    var lecturers = ViewBag.Lecturers as List<UniversityTimetable.Domain.Entities.Lecturer> ?? new List<UniversityTimetable.Domain.Entities.Lecturer>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1"><i class="fa-solid fa-book-open text-success me-2"></i>Course Catalog & Requirements</h3>
+        <p class="text-muted mb-0">Manage university courses, contact hours, lab requirements, and assigned faculty.</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#createModal">
+        <i class="fa-solid fa-plus me-2"></i>Add New Course
+    </button>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fa-solid fa-circle-check me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card-custom">
+    <div class="card-body">
+        <table class="table table-hover datatable">
+            <thead class="table-light">
+                <tr>
+                    <th>Code</th>
+                    <th>Title & Short</th>
+                    <th>Level</th>
+                    <th>Contact Hrs</th>
+                    <th>Special Requirements</th>
+                    <th>Lecturer</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td><span class="badge bg-success-subtle text-success fw-bold fs-6">@c.Code</span></td>
+                        <td>
+                            <div class="fw-bold">@c.Title</div>
+                            <small class="text-muted">Short Form: @c.ShortForm | Credits: @c.CreditHours</small>
+                        </td>
+                        <td><span class="badge bg-secondary">Level @((int)c.Level)</span></td>
+                        <td><span class="badge bg-dark">@c.WeeklyContactHours Hrs / Wk</span></td>
+                        <td>
+                            @if (c.ComputerLabRequired) { <span class="badge bg-info me-1"><i class="fa-solid fa-desktop me-1"></i>Comp Lab</span> }
+                            @if (c.LabRequired) { <span class="badge bg-warning text-dark me-1"><i class="fa-solid fa-flask me-1"></i>Science Lab</span> }
+                            @if (c.FieldWorkRequired) { <span class="badge bg-purple text-white me-1" style="background:#9333ea;"><i class="fa-solid fa-compass me-1"></i>Field Work</span> }
+                            @if (!c.ComputerLabRequired && !c.LabRequired && !c.FieldWorkRequired) { <span class="text-muted small">Standard Lecture</span> }
+                        </td>
+                        <td>@(c.AssignedLecturer?.FullName ?? "Unassigned")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editCourse(@c.Id, '@c.Code', '@c.ShortForm', '@c.Title', @c.CreditHours, @c.WeeklyContactHours, @c.DepartmentId, @c.ProgrammeId, @((int)c.Level), @(c.AssignedLecturerId ?? 0), @c.ComputerLabRequired.ToString().ToLower(), @c.LabRequired.ToString().ToLower(), @c.FieldWorkRequired.ToString().ToLower())">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <form action="/Admin/Course/Delete" method="post" class="d-inline" onsubmit="return confirm('Delete this course?');">
+                                <input type="hidden" name="id" value="@c.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <form action="/Admin/Course/Create" method="post">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-plus me-2"></i>Add Course</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Course Code</label>
+                            <input type="text" name="Code" class="form-control" placeholder="e.g. CS201" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Short Form</label>
+                            <input type="text" name="ShortForm" class="form-control" placeholder="e.g. OOP" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Credit Hours</label>
+                            <input type="number" name="CreditHours" class="form-control" value="3" required />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Course Title</label>
+                        <input type="text" name="Title" class="form-control" placeholder="e.g. Object-Oriented Programming" required />
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Department</label>
+                            <select name="DepartmentId" class="form-select" required>
+                                @foreach (var d in departments) { <option value="@d.Id">@d.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Programme</label>
+                            <select name="ProgrammeId" class="form-select" required>
+                                @foreach (var p in programmes) { <option value="@p.Id">@p.Name</option> }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Level</label>
+                            <select name="Level" class="form-select">
+                                <option value="100">Level 100</option>
+                                <option value="200" selected>Level 200</option>
+                                <option value="300">Level 300</option>
+                                <option value="400">Level 400</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Weekly Contact Hours (Min 4)</label>
+                            <input type="number" name="WeeklyContactHours" class="form-control" value="4" min="4" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Assigned Lecturer</label>
+                            <select name="AssignedLecturerId" class="form-select">
+                                <option value="">-- Unassigned --</option>
+                                @foreach (var l in lecturers) { <option value="@l.Id">@l.FullName</option> }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card p-3 bg-light">
+                        <label class="form-label fw-bold mb-2">Special Scheduling Flags</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input type="checkbox" name="ComputerLabRequired" value="true" class="form-check-input" id="cLab">
+                                <label class="form-check-label fw-semibold" for="cLab">Computer Lab Required</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="LabRequired" value="true" class="form-check-input" id="sLab">
+                                <label class="form-check-label fw-semibold" for="sLab">Science Lab Required</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="FieldWorkRequired" value="true" class="form-check-input" id="fWork">
+                                <label class="form-check-label fw-semibold" for="fWork">Field Work Session</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">Save Course</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <form action="/Admin/Course/Edit" method="post">
+            <input type="hidden" name="Id" id="editId" />
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i>Edit Course</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Course Code</label>
+                            <input type="text" name="Code" id="editCode" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Short Form</label>
+                            <input type="text" name="ShortForm" id="editShortForm" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Credit Hours</label>
+                            <input type="number" name="CreditHours" id="editCreditHours" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Course Title</label>
+                        <input type="text" name="Title" id="editTitle" class="form-control" required />
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Department</label>
+                            <select name="DepartmentId" id="editDeptId" class="form-select" required>
+                                @foreach (var d in departments) { <option value="@d.Id">@d.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Programme</label>
+                            <select name="ProgrammeId" id="editProgId" class="form-select" required>
+                                @foreach (var p in programmes) { <option value="@p.Id">@p.Name</option> }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Level</label>
+                            <select name="Level" id="editLevel" class="form-select">
+                                <option value="100">Level 100</option>
+                                <option value="200">Level 200</option>
+                                <option value="300">Level 300</option>
+                                <option value="400">Level 400</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Weekly Contact Hours (Min 4)</label>
+                            <input type="number" name="WeeklyContactHours" id="editContactHours" class="form-control" min="4" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Assigned Lecturer</label>
+                            <select name="AssignedLecturerId" id="editLecturerId" class="form-select">
+                                <option value="">-- Unassigned --</option>
+                                @foreach (var l in lecturers) { <option value="@l.Id">@l.FullName</option> }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card p-3 bg-light">
+                        <label class="form-label fw-bold mb-2">Special Scheduling Flags</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input type="checkbox" name="ComputerLabRequired" value="true" class="form-check-input" id="editCLab">
+                                <label class="form-check-label fw-semibold" for="editCLab">Computer Lab Required</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="LabRequired" value="true" class="form-check-input" id="editSLab">
+                                <label class="form-check-label fw-semibold" for="editSLab">Science Lab Required</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="FieldWorkRequired" value="true" class="form-check-input" id="editFWork">
+                                <label class="form-check-label fw-semibold" for="editFWork">Field Work Session</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function editCourse(id, code, shortForm, title, credits, contactHrs, deptId, progId, level, lecturerId, cLab, sLab, fWork) {
+            $('#editId').val(id);
+            $('#editCode').val(code);
+            $('#editShortForm').val(shortForm);
+            $('#editTitle').val(title);
+            $('#editCreditHours').val(credits);
+            $('#editContactHours').val(contactHrs);
+            $('#editDeptId').val(deptId);
+            $('#editProgId').val(progId);
+            $('#editLevel').val(level);
+            $('#editLecturerId').val(lecturerId || '');
+            $('#editCLab').prop('checked', cLab);
+            $('#editSLab').prop('checked', sLab);
+            $('#editFWork').prop('checked', fWork);
+            new bootstrap.Modal(document.getElementById('editModal')).show();
+        }
+    </script>
+}

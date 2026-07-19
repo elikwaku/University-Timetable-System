@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/UniversityTimetable.Core/UniversityTimetable.Core.csproj" />
+    <Project Path="src/UniversityTimetable.Domain/UniversityTimetable.Domain.csproj" />
+    <Project Path="src/UniversityTimetable.Infrastructure/UniversityTimetable.Infrastructure.csproj" />
+    <Project Path="src/UniversityTimetable.Web/UniversityTimetable.Web.csproj" />
+  </Folder>
+</Solution>

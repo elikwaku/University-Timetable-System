@@ -1,0 +1,81 @@
+@model UniversityTimetable.Domain.Entities.Student
+@{
+    Layout = "_StudentLayout";
+    ViewData["Title"] = "Student Dashboard";
+    var todayEntries = ViewBag.TodayEntries as List<UniversityTimetable.Domain.Entities.TimetableEntry> ?? new List<UniversityTimetable.Domain.Entities.TimetableEntry>();
+}
+
+<!-- Student Welcome Banner -->
+<div class="card bg-primary text-white border-0 rounded-4 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <span class="badge bg-white text-primary fw-bold mb-2">STUDENT PROFILE</span>
+            <h2 class="fw-bold mb-1">Welcome back, @Model.FullName!</h2>
+            <p class="mb-0 opacity-90"><i class="fa-solid fa-id-card me-1"></i> Index: <strong>@Model.IndexNumber</strong> | @Model.Programme?.Name | Level @((int)Model.Level) (@(Model.StudentGroup?.Name ?? "Main"))</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="/Student/StudentTimetable" class="btn btn-light text-primary fw-bold px-4 shadow-sm">
+                <i class="fa-solid fa-calendar-week me-2"></i>View Full Schedule
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Today's Classes Timeline -->
+    <div class="col-md-8">
+        <div class="student-card p-4">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-clock me-2 text-primary"></i>Today's Class Schedule (@DateTime.Today.DayOfWeek)</h5>
+                <span class="badge bg-primary-subtle text-primary">@todayEntries.Count Sessions Today</span>
+            </div>
+
+            @if (todayEntries.Any())
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var entry in todayEntries)
+                    {
+                        <div class="list-group-item p-3 border-0 bg-light rounded mb-2 d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="time-badge"><i class="fa-regular fa-clock me-1"></i>@entry.StartTime.ToString(@"hh\:mm") - @entry.EndTime.ToString(@"hh\:mm")</span>
+                                <div>
+                                    <div class="fw-bold text-dark fs-6">@entry.Course?.Code - @entry.Course?.Title</div>
+                                    <small class="text-muted">
+                                        <i class="fa-solid fa-door-open me-1"></i>@entry.Classroom?.RoomNumber (@entry.Classroom?.Building?.Code) |
+                                        <i class="fa-solid fa-user me-1"></i>@entry.Lecturer?.FullName
+                                    </small>
+                                </div>
+                            </div>
+                            <span class="badge @(entry.SessionType == UniversityTimetable.Domain.Enums.SessionType.CombinedClass ? "bg-purple text-white" : "bg-primary")" style="@(entry.SessionType == UniversityTimetable.Domain.Enums.SessionType.CombinedClass ? "background:#9333ea;" : "")">
+                                @entry.SessionType
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="p-4 text-center text-muted">
+                    <i class="fa-solid fa-calendar-check fa-3x mb-2 opacity-50 text-success"></i>
+                    <h6 class="fw-bold">No Classes Scheduled for Today</h6>
+                    <p class="mb-0 small">You have no active lectures or lab sessions scheduled for today. Enjoy your break or study time!</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Quick Stats & Notifications -->
+    <div class="col-md-4">
+        <div class="student-card p-4">
+            <h6 class="fw-bold mb-3"><i class="fa-solid fa-bullhorn text-warning me-2"></i>Timetable Notices</h6>
+            <div class="p-3 bg-light rounded mb-3">
+                <div class="fw-semibold small mb-1 text-primary"><i class="fa-solid fa-circle-check me-1"></i>Timetable Published</div>
+                <small class="text-muted d-block">Semester 1 Master Timetable has been officially validated and published by the administration.</small>
+            </div>
+            <div class="p-3 bg-light rounded">
+                <div class="fw-semibold small mb-1 text-success"><i class="fa-solid fa-shield me-1"></i>0 Conflict Guarantee</div>
+                <small class="text-muted d-block">All personal lectures, combined sessions, and lab allocations are conflict-free.</small>
+            </div>
+        </div>
+    </div>
+</div>

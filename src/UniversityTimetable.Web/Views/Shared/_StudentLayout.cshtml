@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Student Portal | University Timetable System</title>
+    <!-- Google Fonts & Bootstrap 5 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+    <!-- Toastr -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .student-header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #fff; padding: 1.5rem 0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .student-nav { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+        .student-nav .nav-link { color: #64748b; font-weight: 500; padding: 1rem 1.25rem; border-bottom: 2px solid transparent; }
+        .student-nav .nav-link:hover, .student-nav .nav-link.active { color: #2563eb; border-bottom-color: #2563eb; }
+        .student-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .badge-student { background: #22c55e; color: #fff; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+        .time-badge { font-size: 0.8rem; font-weight: 600; background: #eff6ff; color: #1d4ed8; padding: 4px 10px; border-radius: 6px; }
+    </style>
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+    <!-- Student Top Banner -->
+    <header class="student-header">
+        <div class="container d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3">
+                <i class="fa-solid fa-graduation-cap fa-2x"></i>
+                <div>
+                    <h4 class="mb-0 fw-bold">UNIVERSITY STUDENT PORTAL</h4>
+                    <small class="opacity-75">Personal Timetable & Academic Schedule</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge-student"><i class="fa-solid fa-user-check me-1"></i> Student Verified</span>
+                <a href="/Student/Account/Logout" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-right-from-bracket me-1"></i> Sign Out</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Student Navigation Bar -->
+    <nav class="student-nav">
+        <div class="container">
+            <ul class="nav">
+                <li class="nav-item">
+                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "StudentDashboard" ? "active" : "")" href="/Student/StudentDashboard">
+                        <i class="fa-solid fa-house me-1"></i> Student Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "StudentTimetable" ? "active" : "")" href="/Student/StudentTimetable">
+                        <i class="fa-solid fa-calendar-week me-1"></i> My Weekly Timetable
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container py-4">
+        @RenderBody()
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-top py-3 mt-5 bg-white text-center text-muted small">
+        <div class="container">
+            &copy; 2026 University Timetable Management System. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>
