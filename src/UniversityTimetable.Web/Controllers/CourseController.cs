@@ -35,7 +35,8 @@ namespace UniversityTimetable.Web.Controllers
         [HttpPost("Create")]
         public async Task<IActionResult> Create(Course course)
         {
-            if (course.WeeklyContactHours < 4) course.WeeklyContactHours = 4;
+            if (course.WeeklyContactHours < 2) course.WeeklyContactHours = 2;
+            if (course.WeeklyContactHours > 6) course.WeeklyContactHours = 6;
 
             _context.Courses.Add(course);
             await _context.SaveChangesAsync();
@@ -53,7 +54,7 @@ namespace UniversityTimetable.Web.Controllers
                 existing.ShortForm = course.ShortForm;
                 existing.Title = course.Title;
                 existing.CreditHours = course.CreditHours;
-                existing.WeeklyContactHours = course.WeeklyContactHours < 4 ? 4 : course.WeeklyContactHours;
+                existing.WeeklyContactHours = course.WeeklyContactHours < 2 ? 2 : (course.WeeklyContactHours > 6 ? 6 : course.WeeklyContactHours);
                 existing.DepartmentId = course.DepartmentId;
                 existing.ProgrammeId = course.ProgrammeId;
                 existing.Level = course.Level;

@@ -42,7 +42,8 @@ namespace UniversityTimetable.Infrastructure.Data
                 {
                     new SystemSetting { Key = "BreakStartTime", Value = "12:30", Category = "Scheduling", Description = "Official university daily break start time" },
                     new SystemSetting { Key = "BreakEndTime", Value = "13:00", Category = "Scheduling", Description = "Official university daily break end time" },
-                    new SystemSetting { Key = "MinWeeklyContactHours", Value = "4", Category = "Academic", Description = "Minimum required weekly contact hours per course" },
+                    new SystemSetting { Key = "MinWeeklyContactHours", Value = "2", Category = "Academic", Description = "Minimum required weekly contact hours per course" },
+                    new SystemSetting { Key = "MaxWeeklyContactHours", Value = "6", Category = "Academic", Description = "Maximum allowed weekly contact hours per course" },
                     new SystemSetting { Key = "MaxDailyLecturerHours", Value = "6", Category = "Scheduling", Description = "Maximum teaching hours allowed per day for a lecturer" }
                 });
                 await context.SaveChangesAsync();
@@ -192,8 +193,8 @@ namespace UniversityTimetable.Infrastructure.Data
             }
 
             // 7. Student Groups & Students
-            var csProgObj = await context.Programmes.FirstAsync(p => p.Code == "BSC-CS");
-            var busProgObj = await context.Programmes.FirstAsync(p => p.Code == "BSC-BA");
+            var csProgObj = await context.Programmes.FirstOrDefaultAsync(p => p.Code == "BSC-CS") ?? await context.Programmes.FirstOrDefaultAsync();
+            var busProgObj = await context.Programmes.FirstOrDefaultAsync(p => p.Code == "BSC-BA") ?? csProgObj;
 
             if (!await context.StudentGroups.AnyAsync())
             {

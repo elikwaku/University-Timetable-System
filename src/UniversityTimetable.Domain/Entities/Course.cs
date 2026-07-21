@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UniversityTimetable.Domain.Enums;
 
+using System.ComponentModel.DataAnnotations;
+
 namespace UniversityTimetable.Domain.Entities
 {
     public class Course : BaseEntity
@@ -10,7 +12,9 @@ namespace UniversityTimetable.Domain.Entities
         public string Title { get; set; } = string.Empty; // e.g. "Object-Oriented Programming"
 
         public int CreditHours { get; set; } = 3;
-        public int WeeklyContactHours { get; set; } = 4; // minimum 4 contact hours per prompt requirements
+        
+        [Range(2, 6, ErrorMessage = "Weekly contact hours must be between 2 and 6.")]
+        public int WeeklyContactHours { get; set; } = 3;
 
         public int DepartmentId { get; set; }
         public Department? Department { get; set; }

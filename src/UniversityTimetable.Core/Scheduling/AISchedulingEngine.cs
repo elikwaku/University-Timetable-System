@@ -81,9 +81,11 @@ namespace UniversityTimetable.Core.Scheduling
             // 2. Generate Available Time Slots (1h & 2h windows, excluding break)
             var availableSlots = TimeSlotGenerator.GenerateAvailableTimeSlots(options.DayStartTime, options.DayEndTime, options.BreakStartTime, options.BreakEndTime);
 
-            // 3. Build Demands for each Course & Sort by Student Count (Large Classes Priority)
+            // 3. Build Demands for each Course & Sort: Give Computer Lab required courses highest priority, then sort by Student Count & Contact Hours
             var courseDemands = BuildCourseDemands(courses, studentGroups, classrooms)
-                .OrderByDescending(d => d.StudentGroup?.StudentCount ?? d.EstimatedCombinedSize)
+                .OrderByDescending(d => d.Course.ComputerLabRequired)
+                .ThenByDescending(d => d.Course.LabRequired)
+                .ThenByDescending(d => d.StudentGroup?.StudentCount ?? d.EstimatedCombinedSize)
                 .ThenByDescending(d => d.Course.WeeklyContactHours)
                 .ToList();
 
@@ -388,6 +390,21 @@ namespace UniversityTimetable.Core.Scheduling
                 score -= 40.0; // Reserve large capacity rooms for large classes
             }
 
+            // 8. Computer Lab Priority Alignment:
+            // Priority is given to courses that require a computer lab. Computer labs can be treated as normal lecture rooms/halls,
+            // but normal courses receive a soft penalty so standard lecture halls are preferred first.
+            if (room.RoomType == RoomType.ComputerLab)
+            {
+                if (demand.Course.ComputerLabRequired || demand.SessionType == SessionType.ComputerLab)
+                {
+                    score += 80.0; // High priority bonus for Computer Lab required courses
+                }
+                else
+                {
+                    score -= 30.0; // Soft penalty for non-computer-lab courses so normal lecture halls/rooms are preferred first
+                }
+            }
+
             return score;
         }
 
@@ -398,9 +415,10 @@ namespace UniversityTimetable.Core.Scheduling
             if (sessionType == SessionType.Lab || course.LabRequired)
                 return new List<RoomType> { RoomType.Lab };
             if (sessionType == SessionType.CombinedClass)
-                return new List<RoomType> { RoomType.LectureHall };
+                return new List<RoomType> { RoomType.LectureHall, RoomType.SeminarRoom, RoomType.ComputerLab };
 
-            return new List<RoomType> { RoomType.LectureHall, RoomType.SeminarRoom };
+            // Computer labs can be treated as normal lecture rooms or halls for general courses as well
+            return new List<RoomType> { RoomType.LectureHall, RoomType.SeminarRoom, RoomType.ComputerLab };
         }
 
         private bool HasCollision(

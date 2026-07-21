@@ -80,18 +80,30 @@ namespace UniversityTimetable.Core.Scheduling
         }
 
         /// <summary>
-        /// Partitions weekly contact hours (e.g. 4 hours) into allowed combinations of 1h and 2h sessions.
+        /// Partitions weekly contact hours (min 4, max 6) into allowed combinations of 1h and 2h sessions.
         /// </summary>
         public static List<List<int>> GetValidSessionCombinations(int totalContactHours)
         {
             var combinations = new List<List<int>>();
 
-            // Standard combinations for 4 hours:
-            if (totalContactHours == 4)
+            if (totalContactHours == 6)
             {
-                combinations.Add(new List<int> { 2, 2 });       // 2h + 2h
-                combinations.Add(new List<int> { 2, 1, 1 });    // 2h + 1h + 1h
-                combinations.Add(new List<int> { 1, 1, 1, 1 }); // 1h + 1h + 1h + 1h
+                combinations.Add(new List<int> { 2, 2, 2 });          // 2h + 2h + 2h
+                combinations.Add(new List<int> { 2, 2, 1, 1 });       // 2h + 2h + 1h + 1h
+                combinations.Add(new List<int> { 2, 1, 1, 1, 1 });    // 2h + 1h + 1h + 1h + 1h
+                combinations.Add(new List<int> { 1, 1, 1, 1, 1, 1 }); // 6 x 1h
+            }
+            else if (totalContactHours == 5)
+            {
+                combinations.Add(new List<int> { 2, 2, 1 });          // 2h + 2h + 1h
+                combinations.Add(new List<int> { 2, 1, 1, 1 });       // 2h + 1h + 1h + 1h
+                combinations.Add(new List<int> { 1, 1, 1, 1, 1 });    // 5 x 1h
+            }
+            else if (totalContactHours == 4)
+            {
+                combinations.Add(new List<int> { 2, 2 });          // 2h + 2h
+                combinations.Add(new List<int> { 2, 1, 1 });       // 2h + 1h + 1h
+                combinations.Add(new List<int> { 1, 1, 1, 1 });    // 1h + 1h + 1h + 1h
             }
             else if (totalContactHours == 3)
             {
