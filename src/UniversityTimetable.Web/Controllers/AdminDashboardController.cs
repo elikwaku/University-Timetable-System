@@ -26,7 +26,7 @@ namespace UniversityTimetable.Web.Controllers
             ViewBag.TotalProgrammes = await _context.Programmes.CountAsync();
             ViewBag.TotalCourses = await _context.Courses.CountAsync();
             ViewBag.TotalLecturers = await _context.Lecturers.CountAsync();
-            ViewBag.TotalStudents = await _context.Students.CountAsync();
+            ViewBag.TotalStudents = await _context.StudentGroups.SumAsync(g => (int?)g.StudentCount) ?? 0;
             ViewBag.TotalClassrooms = await _context.Classrooms.CountAsync();
 
             var activeTimetable = await _context.Timetables

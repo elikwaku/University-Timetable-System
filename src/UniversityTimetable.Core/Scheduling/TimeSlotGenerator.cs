@@ -18,15 +18,16 @@ namespace UniversityTimetable.Core.Scheduling
     {
         public static List<TimeSlot> GenerateAvailableTimeSlots(TimeSpan breakStart, TimeSpan breakEnd)
         {
+            return GenerateAvailableTimeSlots(new TimeSpan(6, 30, 0), new TimeSpan(19, 0, 0), breakStart, breakEnd);
+        }
+
+        public static List<TimeSlot> GenerateAvailableTimeSlots(TimeSpan dayStart, TimeSpan dayEnd, TimeSpan breakStart, TimeSpan breakEnd)
+        {
             var slots = new List<TimeSlot>();
             var days = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
 
             foreach (var day in days)
             {
-                // Day runs 08:00 to 17:00
-                var dayStart = new TimeSpan(8, 0, 0);
-                var dayEnd = new TimeSpan(17, 0, 0);
-
                 // 1-Hour Slots
                 var current = dayStart;
                 while (current.Add(TimeSpan.FromHours(1)) <= dayEnd)

@@ -47,6 +47,7 @@ namespace UniversityTimetable.Infrastructure.Data
             builder.Entity<Course>().HasQueryFilter(e => !e.IsDeleted);
             builder.Entity<Timetable>().HasQueryFilter(e => !e.IsDeleted);
             builder.Entity<TimetableEntry>().HasQueryFilter(e => !e.IsDeleted);
+            builder.Entity<SystemSetting>().HasQueryFilter(e => !e.IsDeleted);
 
             // Relationships and Indexes
             builder.Entity<Department>()

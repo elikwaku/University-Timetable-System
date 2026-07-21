@@ -16,6 +16,15 @@ namespace UniversityTimetable.Infrastructure.Data
         {
             await context.Database.EnsureCreatedAsync();
 
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE StudentGroups ADD COLUMN IgnoreSplit INTEGER NOT NULL DEFAULT 0;");
+            }
+            catch
+            {
+                // Column already exists or database table created with IgnoreSplit
+            }
+
             // 1. Roles
             string[] roles = new[] { "SuperAdmin", "TimetableAdmin", "DepartmentAdmin", "Student" };
             foreach (var role in roles)

@@ -168,40 +168,47 @@ namespace UniversityTimetable.Core.Scheduling
                 }
             }
 
-            // 8. Contact Hours & Combined Lecture Validation
+            // 8. Contact Hours Validation
             foreach (var course in courses)
             {
                 var courseEntries = entries.Where(e => e.CourseId == course.Id).ToList();
-                int scheduledHours = courseEntries.Sum(e => e.DurationHours);
-
-                if (scheduledHours < course.WeeklyContactHours)
-                {
-                    reports.Add(new ClashReport
-                    {
-                        TimetableId = timetableId,
-                        ConflictType = ConflictType.UnfulfilledContactHours,
-                        Severity = ConflictSeverity.High,
-                        AffectedEntryIds = string.Join(",", courseEntries.Select(e => e.Id)),
-                        Description = $"Course {course.Code} requires {course.WeeklyContactHours} weekly contact hours, but only {scheduledHours} hours are scheduled.",
-                        Recommendation = "Add additional 1-hour or 2-hour sessions."
-                    });
-                }
-
-                // Check combined class requirement for split student groups
                 var groupsForCourse = studentGroups.Where(g => g.ProgrammeId == course.ProgrammeId && g.Level == course.Level).ToList();
-                if (groupsForCourse.Count > 1)
+
+                if (groupsForCourse.Any())
                 {
-                    bool hasCombined = courseEntries.Any(e => e.SessionType == SessionType.CombinedClass || e.StudentGroupId == null);
-                    if (!hasCombined)
+                    foreach (var group in groupsForCourse)
+                    {
+                        int groupHours = courseEntries
+                            .Where(e => e.StudentGroupId == null || e.StudentGroupId == group.Id)
+                            .Sum(e => e.DurationHours);
+
+                        if (groupHours < course.WeeklyContactHours)
+                        {
+                            reports.Add(new ClashReport
+                            {
+                                TimetableId = timetableId,
+                                ConflictType = ConflictType.UnfulfilledContactHours,
+                                Severity = ConflictSeverity.High,
+                                AffectedEntryIds = string.Join(",", courseEntries.Select(e => e.Id)),
+                                Description = $"Course {course.Code} ({group.Name}) requires {course.WeeklyContactHours} weekly contact hours, but only {groupHours} hours are scheduled for this group.",
+                                Recommendation = "Schedule additional sessions for this group to fulfill required contact hours."
+                            });
+                        }
+                    }
+                }
+                else
+                {
+                    int scheduledHours = courseEntries.Sum(e => e.DurationHours);
+                    if (scheduledHours < course.WeeklyContactHours)
                     {
                         reports.Add(new ClashReport
                         {
                             TimetableId = timetableId,
-                            ConflictType = ConflictType.MissingCombinedLecture,
+                            ConflictType = ConflictType.UnfulfilledContactHours,
                             Severity = ConflictSeverity.High,
                             AffectedEntryIds = string.Join(",", courseEntries.Select(e => e.Id)),
-                            Description = $"Course {course.Code} has split student groups ({groupsForCourse.Count} groups) but is missing its mandatory weekly Combined Lecture.",
-                            Recommendation = "Schedule a combined lecture session involving all student groups for this course."
+                            Description = $"Course {course.Code} requires {course.WeeklyContactHours} weekly contact hours, but only {scheduledHours} hours are scheduled.",
+                            Recommendation = "Add additional 1-hour or 2-hour sessions."
                         });
                     }
                 }

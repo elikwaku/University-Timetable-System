@@ -11,6 +11,7 @@ namespace UniversityTimetable.Domain.Entities
 
         public DegreeLevel Level { get; set; } = DegreeLevel.Level100;
         public int StudentCount { get; set; }
+        public bool IgnoreSplit { get; set; } = false;
 
         public ICollection<Student> Students { get; set; } = new List<Student>();
     }

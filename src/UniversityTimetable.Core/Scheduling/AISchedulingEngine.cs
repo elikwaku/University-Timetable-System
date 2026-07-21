@@ -9,6 +9,8 @@ namespace UniversityTimetable.Core.Scheduling
 {
     public class SchedulingOptions
     {
+        public TimeSpan DayStartTime { get; set; } = new TimeSpan(6, 30, 0);
+        public TimeSpan DayEndTime { get; set; } = new TimeSpan(19, 0, 0);
         public TimeSpan BreakStartTime { get; set; } = new TimeSpan(12, 30, 0);
         public TimeSpan BreakEndTime { get; set; } = new TimeSpan(13, 0, 0);
         public bool BalanceWorkload { get; set; } = true;
@@ -77,10 +79,13 @@ namespace UniversityTimetable.Core.Scheduling
             }
 
             // 2. Generate Available Time Slots (1h & 2h windows, excluding break)
-            var availableSlots = TimeSlotGenerator.GenerateAvailableTimeSlots(options.BreakStartTime, options.BreakEndTime);
+            var availableSlots = TimeSlotGenerator.GenerateAvailableTimeSlots(options.DayStartTime, options.DayEndTime, options.BreakStartTime, options.BreakEndTime);
 
-            // 3. Build Demands for each Course
-            var courseDemands = BuildCourseDemands(courses, studentGroups, classrooms);
+            // 3. Build Demands for each Course & Sort by Student Count (Large Classes Priority)
+            var courseDemands = BuildCourseDemands(courses, studentGroups, classrooms)
+                .OrderByDescending(d => d.StudentGroup?.StudentCount ?? d.EstimatedCombinedSize)
+                .ThenByDescending(d => d.Course.WeeklyContactHours)
+                .ToList();
 
             int scheduledCount = 0;
             int unscheduledCount = 0;
@@ -103,57 +108,69 @@ namespace UniversityTimetable.Core.Scheduling
                     var validRoomTypes = GetRequiredRoomTypes(demand.Course, demand.SessionType);
                     var candidateRooms = classrooms.Where(r => r.IsActive && validRoomTypes.Contains(r.RoomType)).ToList();
 
-                    // Sort rooms by capacity matching (smallest fit first to optimize large room utilization)
+                    // Prioritize room allocation based on student count
                     int demandSize = demand.StudentGroup?.StudentCount ?? demand.EstimatedCombinedSize;
-                    candidateRooms = candidateRooms.Where(r => r.Capacity >= demandSize)
-                        .OrderBy(r => r.Capacity).ToList();
+                    if (demandSize > 80)
+                    {
+                        // Large classes (>80) get priority to use large capacity classrooms
+                        candidateRooms = candidateRooms.Where(r => r.Capacity >= demandSize)
+                            .OrderByDescending(r => r.Capacity).ToList();
+                    }
+                    else
+                    {
+                        // Standard classes use tightest fit rooms to preserve large rooms for large classes
+                        candidateRooms = candidateRooms.Where(r => r.Capacity >= demandSize)
+                            .OrderBy(r => r.Capacity).ToList();
+                    }
 
                     if (!candidateRooms.Any())
                     {
-                        // Fallback to any room if capacity constraint tight
+                        // Fallback to any suitable room if capacity constraint is tight
                         candidateRooms = classrooms.Where(r => r.IsActive && validRoomTypes.Contains(r.RoomType)).OrderByDescending(r => r.Capacity).ToList();
                     }
 
                     var lecturer = demand.AssignedLecturer;
                     var candidateSlots = availableSlots.Where(s => s.DurationHours == sessionDuration).ToList();
 
+                    // Score and select best (slot, room) pair based on AI Priority Heuristics
+                    var bestPair = candidateSlots
+                        .SelectMany(slot => candidateRooms.Select(room => new { Slot = slot, Room = room }))
+                        .Where(sr => !HasCollision(sr.Slot, sr.Room.Id, lecturer.Id, demand.StudentGroup?.Id, demand.Course.ProgrammeId, demand.Course.Level, entries, options))
+                        .OrderByDescending(sr => CalculateSlotScore(sr.Slot, sr.Room, lecturer, demand, entries))
+                        .FirstOrDefault();
+
                     bool assigned = false;
 
-                    foreach (var slot in candidateSlots)
+                    if (bestPair != null)
                     {
-                        foreach (var room in candidateRooms)
+                        var effectiveSessionType = (bestPair.Room.Capacity > 100) ? SessionType.CombinedClass : demand.SessionType;
+
+                        var newEntry = new TimetableEntry
                         {
-                            // Check collisions against current placed entries
-                            if (!HasCollision(slot, room.Id, lecturer.Id, demand.StudentGroup?.Id, demand.Course.ProgrammeId, demand.Course.Level, entries, options))
-                            {
-                                var newEntry = new TimetableEntry
-                                {
-                                    TimetableId = timetable.Id,
-                                    CourseId = demand.Course.Id,
-                                    LecturerId = lecturer.Id,
-                                    ClassroomId = room.Id,
-                                    StudentGroupId = demand.StudentGroup?.Id,
-                                    DayOfWeek = slot.DayOfWeek,
-                                    StartTime = slot.StartTime,
-                                    EndTime = slot.EndTime,
-                                    DurationHours = sessionDuration,
-                                    SessionType = demand.SessionType,
-                                    IsLocked = false
-                                };
+                            TimetableId = timetable.Id,
+                            CourseId = demand.Course.Id,
+                            LecturerId = lecturer.Id,
+                            ClassroomId = bestPair.Room.Id,
+                            StudentGroupId = demand.StudentGroup?.Id,
+                            DayOfWeek = bestPair.Slot.DayOfWeek,
+                            StartTime = bestPair.Slot.StartTime,
+                            EndTime = bestPair.Slot.EndTime,
+                            DurationHours = sessionDuration,
+                            SessionType = effectiveSessionType,
+                            Remarks = bestPair.Room.Capacity > 100
+                                ? "Combined Class Session (Room Cap > 100)"
+                                : (!string.IsNullOrEmpty(demand.GroupNameLabel) ? $"{demand.GroupNameLabel} Session" : null),
+                            IsLocked = false
+                        };
 
-                                entries.Add(newEntry);
-                                assigned = true;
+                        entries.Add(newEntry);
+                        assigned = true;
 
-                                string context = demand.SessionType == SessionType.CombinedClass
-                                    ? $"Combined Class for split groups."
-                                    : $"Group Session ({demand.StudentGroup?.Name ?? "General"}).";
+                        string context = demand.StudentGroup != null
+                            ? $"Assigned to {demand.StudentGroup.Name} in {bestPair.Room.RoomNumber} (Cap: {bestPair.Room.Capacity}, Type: {effectiveSessionType})."
+                            : $"Combined Session for Course {demand.Course.Code} in {bestPair.Room.RoomNumber}.";
 
-                                logs.Add(_explainabilityService.ExplainAssignment(timetable.Id, demand.Course, lecturer, room, demand.StudentGroup, slot, demand.SessionType, context));
-                                break;
-                            }
-                        }
-
-                        if (assigned) break;
+                        logs.Add(_explainabilityService.ExplainAssignment(timetable.Id, demand.Course, lecturer, bestPair.Room, demand.StudentGroup, bestPair.Slot, effectiveSessionType, context));
                     }
 
                     if (!assigned)
@@ -199,6 +216,7 @@ namespace UniversityTimetable.Core.Scheduling
             public Course Course { get; set; } = null!;
             public Lecturer AssignedLecturer { get; set; } = null!;
             public StudentGroup? StudentGroup { get; set; }
+            public string? GroupNameLabel { get; set; }
             public int RequiredHours { get; set; }
             public SessionType SessionType { get; set; }
             public int EstimatedCombinedSize { get; set; }
@@ -211,52 +229,78 @@ namespace UniversityTimetable.Core.Scheduling
             foreach (var course in courses)
             {
                 var lecturer = course.AssignedLecturer ?? new Lecturer { Id = 1, FullName = "Department Staff" };
+
+                var validRoomTypes = GetRequiredRoomTypes(course, course.ComputerLabRequired ? SessionType.ComputerLab : course.LabRequired ? SessionType.Lab : SessionType.Lecture);
+                var suitableRooms = classrooms.Where(r => r.IsActive && validRoomTypes.Contains(r.RoomType)).ToList();
+                int maxCapacity = suitableRooms.Any() ? suitableRooms.Max(c => c.Capacity) : 100;
+
                 var progGroups = studentGroups.Where(g => g.ProgrammeId == course.ProgrammeId && g.Level == course.Level).ToList();
-
                 int totalEnrolled = progGroups.Sum(g => g.StudentCount);
-                if (totalEnrolled == 0) totalEnrolled = 60; // default assumption
+                if (totalEnrolled == 0) totalEnrolled = 60; // fallback default
 
-                int largestRoomCap = classrooms.Any() ? classrooms.Max(c => c.Capacity) : 100;
+                bool isExplicitlyIgnored = progGroups.Any(g => g.IgnoreSplit);
+                bool exceedsThreshold = totalEnrolled > 80 && !isExplicitlyIgnored;
+                bool needsCapacitySplit = exceedsThreshold || (totalEnrolled > maxCapacity && !isExplicitlyIgnored) || progGroups.Count > 1;
 
-                // Check if split needed
-                if (progGroups.Count > 1 || totalEnrolled > largestRoomCap)
+                if (needsCapacitySplit)
                 {
-                    // Demand 1: Mandatory Weekly Combined Class (2 hours)
-                    demands.Add(new SchedulingDemand
+                    if (progGroups.Count > 1)
                     {
-                        Course = course,
-                        AssignedLecturer = lecturer,
-                        StudentGroup = null, // Combined for all
-                        RequiredHours = 2,
-                        SessionType = SessionType.CombinedClass,
-                        EstimatedCombinedSize = totalEnrolled
-                    });
-
-                    // Demand 2: Group Specific Lab/Practical Sessions (2 hours each)
-                    int remainingHours = Math.Max(2, course.WeeklyContactHours - 2);
-
-                    foreach (var group in progGroups)
-                    {
-                        var sessionType = course.ComputerLabRequired ? SessionType.ComputerLab
-                            : course.LabRequired ? SessionType.Lab
-                            : course.FieldWorkRequired ? SessionType.FieldWork
-                            : SessionType.Lecture;
-
-                        demands.Add(new SchedulingDemand
+                        // Multiple real DB student groups exist (e.g. Group A, Group B)
+                        foreach (var group in progGroups)
                         {
-                            Course = course,
-                            AssignedLecturer = lecturer,
-                            StudentGroup = group,
-                            RequiredHours = remainingHours,
-                            SessionType = sessionType,
-                            EstimatedCombinedSize = group.StudentCount
-                        });
+                            var sessionType = course.ComputerLabRequired ? SessionType.ComputerLab
+                                : course.LabRequired ? SessionType.Lab
+                                : course.FieldWorkRequired ? SessionType.FieldWork
+                                : SessionType.Lecture;
+
+                            demands.Add(new SchedulingDemand
+                            {
+                                Course = course,
+                                AssignedLecturer = lecturer,
+                                StudentGroup = group, // Real DB entity
+                                GroupNameLabel = group.Name,
+                                RequiredHours = course.WeeklyContactHours,
+                                SessionType = sessionType,
+                                EstimatedCombinedSize = group.StudentCount
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // Single real group or no group in DB, but enrollment > 80 or > room max capacity
+                        // Auto-split into two equal groups (or more if capacity demands)
+                        var realGroup = progGroups.FirstOrDefault();
+                        int numGroups = exceedsThreshold ? 2 : (int)Math.Ceiling((double)totalEnrolled / maxCapacity);
+                        if (numGroups < 2) numGroups = 2;
+                        int baseSize = totalEnrolled / numGroups;
+
+                        for (int i = 0; i < numGroups; i++)
+                        {
+                            char letter = (char)('A' + i);
+                            int groupSize = (i == numGroups - 1) ? (totalEnrolled - (baseSize * (numGroups - 1))) : baseSize;
+
+                            var sessionType = course.ComputerLabRequired ? SessionType.ComputerLab
+                                : course.LabRequired ? SessionType.Lab
+                                : course.FieldWorkRequired ? SessionType.FieldWork
+                                : SessionType.Lecture;
+
+                            demands.Add(new SchedulingDemand
+                            {
+                                Course = course,
+                                AssignedLecturer = lecturer,
+                                StudentGroup = realGroup, // Real DB entity (or null)
+                                GroupNameLabel = $"Group {letter}",
+                                RequiredHours = course.WeeklyContactHours, // Fulfills full required weekly contact hours for each group
+                                SessionType = sessionType,
+                                EstimatedCombinedSize = groupSize
+                            });
+                        }
                     }
                 }
                 else
                 {
-                    // Single Group course demand (4 contact hours split into sessions)
-                    var group = progGroups.FirstOrDefault();
+                    var realGroup = progGroups.FirstOrDefault();
                     var sessionType = course.ComputerLabRequired ? SessionType.ComputerLab
                         : course.LabRequired ? SessionType.Lab
                         : course.FieldWorkRequired ? SessionType.FieldWork
@@ -266,7 +310,8 @@ namespace UniversityTimetable.Core.Scheduling
                     {
                         Course = course,
                         AssignedLecturer = lecturer,
-                        StudentGroup = group,
+                        StudentGroup = realGroup, // Real DB entity (or null)
+                        GroupNameLabel = realGroup?.Name ?? "Main Group",
                         RequiredHours = course.WeeklyContactHours,
                         SessionType = sessionType,
                         EstimatedCombinedSize = totalEnrolled
@@ -275,6 +320,75 @@ namespace UniversityTimetable.Core.Scheduling
             }
 
             return demands;
+        }
+
+        private double CalculateSlotScore(
+            TimeSlot slot,
+            Classroom room,
+            Lecturer lecturer,
+            SchedulingDemand demand,
+            List<TimetableEntry> entries)
+        {
+            double score = 0;
+            int demandSize = demand.StudentGroup?.StudentCount ?? demand.EstimatedCombinedSize;
+
+            // 1. Room Fit Efficiency (Prefer tighter fit so large rooms stay available)
+            int excessCap = room.Capacity - demandSize;
+            if (excessCap >= 0)
+            {
+                score += Math.Max(0, 50 - (excessCap / 2.0));
+            }
+
+            // 2. Lecturer Workload Balancing (Prefer days with fewer scheduled hours for lecturer)
+            int lecturerHoursOnDay = entries
+                .Where(e => e.LecturerId == lecturer.Id && e.DayOfWeek == slot.DayOfWeek)
+                .Sum(e => e.DurationHours);
+            score -= (lecturerHoursOnDay * 15.0);
+
+            // 3. Student Workload Balancing (Prefer days with fewer scheduled hours for student group)
+            int groupHoursOnDay = entries
+                .Where(e => e.DayOfWeek == slot.DayOfWeek &&
+                            ((demand.StudentGroup != null && e.StudentGroupId == demand.StudentGroup.Id) ||
+                             (e.Course != null && e.Course.ProgrammeId == demand.Course.ProgrammeId && e.Course.Level == demand.Course.Level)))
+                .Sum(e => e.DurationHours);
+            score -= (groupHoursOnDay * 10.0);
+
+            // 4. Compact Scheduling / Gap Minimization
+            bool lecturerContiguous = entries.Any(e => e.LecturerId == lecturer.Id && e.DayOfWeek == slot.DayOfWeek &&
+                                                      (e.EndTime == slot.StartTime || e.StartTime == slot.EndTime));
+            if (lecturerContiguous) score += 20.0;
+
+            bool groupContiguous = entries.Any(e => e.DayOfWeek == slot.DayOfWeek &&
+                                                   demand.StudentGroup != null && e.StudentGroupId == demand.StudentGroup.Id &&
+                                                   (e.EndTime == slot.StartTime || e.StartTime == slot.EndTime));
+            if (groupContiguous) score += 20.0;
+
+            // 5. Prefer standard core periods (08:30 to 16:00)
+            if (slot.StartTime >= new TimeSpan(8, 30, 0) && slot.EndTime <= new TimeSpan(16, 0, 0))
+            {
+                score += 10.0;
+            }
+
+            // 6. Day Distribution: Strongly penalize scheduling multiple sessions of the same course on the same day to split them across the week
+            bool sameCourseSameDay = entries.Any(e => e.CourseId == demand.Course.Id &&
+                                                      ((demand.StudentGroup != null && e.StudentGroupId == demand.StudentGroup.Id) || demand.StudentGroup == null) &&
+                                                      e.DayOfWeek == slot.DayOfWeek);
+            if (sameCourseSameDay)
+            {
+                score -= 80.0; // Encourage splitting course sessions across different days
+            }
+
+            // 7. Room Capacity Priority Alignment: Bonus for large classes in large capacity rooms, penalty for small classes taking large rooms
+            if (demandSize > 80 && room.Capacity >= 100)
+            {
+                score += 60.0; // High priority bonus for large classes using large capacity rooms
+            }
+            else if (demandSize <= 80 && room.Capacity > 100)
+            {
+                score -= 40.0; // Reserve large capacity rooms for large classes
+            }
+
+            return score;
         }
 
         private List<RoomType> GetRequiredRoomTypes(Course course, SessionType sessionType)

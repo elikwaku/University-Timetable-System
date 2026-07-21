@@ -56,10 +56,24 @@ namespace UniversityTimetable.Infrastructure.Services
             {
                 int enrolled = grp.Count();
                 int targetRoomCap = 60; // Standard room capacity threshold
-                int groupsNeeded = (int)Math.Ceiling((double)enrolled / targetRoomCap);
+                int groupsNeeded = enrolled > 80 ? 2 : (int)Math.Ceiling((double)enrolled / targetRoomCap);
                 if (groupsNeeded < 1) groupsNeeded = 1;
 
-                int perGroup = (int)Math.Ceiling((double)enrolled / groupsNeeded);
+                int perGroup = (int)Math.Ceiling((double)enrolled / (double)groupsNeeded);
+
+                string rationale;
+                if (enrolled > 80)
+                {
+                    rationale = $"Class size ({enrolled}) exceeds 80 students. Automatically split into 2 groups (Group 1 & Group 2) with equal weekly lecturer meeting times and contact hours.";
+                }
+                else if (enrolled > targetRoomCap)
+                {
+                    rationale = $"Class size ({enrolled}) exceeds standard room capacity ({targetRoomCap}). Recommending split into {groupsNeeded} groups.";
+                }
+                else
+                {
+                    rationale = $"Class size ({enrolled}) fits within room capacity (<= 80). Single group recommended.";
+                }
 
                 result.GroupSuggestions.Add(new StudentGroupSuggestion
                 {
@@ -68,9 +82,7 @@ namespace UniversityTimetable.Infrastructure.Services
                     TotalEnrolled = enrolled,
                     RecommendedGroupsCount = groupsNeeded,
                     RecommendedStudentsPerGroup = perGroup,
-                    Rationale = enrolled > targetRoomCap
-                        ? $"Class size ({enrolled}) exceeds standard room capacity ({targetRoomCap}). Recommending split into {groupsNeeded} groups."
-                        : $"Class size ({enrolled}) fits within room capacity. Single group recommended."
+                    Rationale = rationale
                 });
             }
 

@@ -14,7 +14,7 @@ namespace UniversityTimetable.Domain.Entities
     public class Classroom : BaseEntity
     {
         public string RoomNumber { get; set; } = string.Empty;
-        public int BuildingId { get; set; }
+        public int? BuildingId { get; set; }
         public Building? Building { get; set; }
 
         public int Capacity { get; set; }

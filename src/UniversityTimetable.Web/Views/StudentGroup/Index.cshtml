@@ -1,23 +1,30 @@
 @model IEnumerable<UniversityTimetable.Domain.Entities.StudentGroup>
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Student Groups & CSV Import";
+    ViewData["Title"] = "Student Grouping & Capacity Management";
     var programmes = ViewBag.Programmes as List<UniversityTimetable.Domain.Entities.Programme> ?? new List<UniversityTimetable.Domain.Entities.Programme>();
-    var importSuggestions = ViewBag.ImportSuggestions as List<UniversityTimetable.Infrastructure.Services.StudentGroupSuggestion>;
 }
 
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1"><i class="fa-solid fa-users-rectangle text-purple me-2" style="color:#9333ea;"></i>Student Grouping & Roster Management</h3>
-        <p class="text-muted mb-0">Manage student groups, level divisions, and run bulk CSV roster imports with AI auto-grouping suggestions.</p>
+        <h3 class="fw-bold mb-1"><i class="fa-solid fa-users-rectangle text-purple me-2" style="color:#9333ea;"></i>Student Grouping & Capacity Management</h3>
+        <p class="text-muted mb-0">Set total student numbers per group. The AI scheduling engine uses student counts to automatically divide classes (>80 students) for timetable arrangement.</p>
     </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-outline-success fw-semibold" data-bs-toggle="modal" data-bs-target="#importModal">
-            <i class="fa-solid fa-file-csv me-2"></i>Import Student CSV
-        </button>
+    <div>
         <button class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#createModal">
             <i class="fa-solid fa-plus me-2"></i>Add Student Group
         </button>
+    </div>
+</div>
+
+<div class="alert alert-info border-info mb-4 d-flex align-items-center">
+    <i class="fa-solid fa-circle-info fa-2x text-info me-3"></i>
+    <div>
+        <strong class="d-block">Automatic Group Splitting (>80 Students) & Combined Class Policy (>100 Room Cap)</strong>
+        <span class="small">
+            1. When total student count exceeds <strong>80 students</strong>, the system automatically splits them into two equal groups (Group A & Group B) with equal weekly meeting times with the lecturer.<br />
+            2. When assigned to a lecture room with capacity <strong>> 100</strong>, sessions are automatically scheduled as a <strong>Combined Class</strong> regardless of student count.
+        </span>
     </div>
 </div>
 
@@ -29,36 +36,6 @@
     </div>
 }
 
-@if (importSuggestions != null && importSuggestions.Any())
-{
-    <div class="card border-primary mb-4">
-        <div class="card-header bg-primary text-white fw-bold d-flex align-items-center justify-content-between">
-            <span><i class="fa-solid fa-wand-magic-sparkles me-2"></i>AI Group Division Recommendations</span>
-            <span class="badge bg-light text-primary">Capacity Optimization</span>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                @foreach (var sug in importSuggestions)
-                {
-                    <div class="col-md-6">
-                        <div class="p-3 border rounded bg-light">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="fw-bold text-dark">@sug.ProgrammeCode - Level @((int)sug.Level)</span>
-                                <span class="badge bg-info">Enrolled: @sug.TotalEnrolled</span>
-                            </div>
-                            <p class="small text-muted mb-2">@sug.Rationale</p>
-                            <div class="d-flex gap-2">
-                                <span class="badge bg-success">Recommended Groups: @sug.RecommendedGroupsCount</span>
-                                <span class="badge bg-secondary">~@sug.RecommendedStudentsPerGroup Students / Group</span>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-}
-
 <div class="card-custom">
     <div class="card-body">
         <table class="table table-hover datatable">
@@ -67,8 +44,7 @@
                     <th>Group Name</th>
                     <th>Programme</th>
                     <th>Level</th>
-                    <th>Student Capacity</th>
-                    <th>Enrolled Students</th>
+                    <th>Total Number of Students</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -76,13 +52,52 @@
                 @foreach (var g in Model)
                 {
                     <tr>
-                        <td><span class="badge bg-purple-subtle text-purple fw-bold fs-6" style="background:#f3e8ff; color:#9333ea;">@g.Name</span></td>
+                        <td>
+                            <span class="badge bg-purple-subtle text-purple fw-bold fs-6" style="background:#f3e8ff; color:#9333ea;">@g.Name</span>
+                            @if (g.StudentCount > 80)
+                            {
+                                if (g.IgnoreSplit)
+                                {
+                                    <span class="badge bg-secondary text-white ms-1" title=">80 Auto-Split ignored for this group"><i class="fa-solid fa-eye-slash me-1"></i>Split Ignored</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark ms-1" title="Exceeds 80 students limit"><i class="fa-solid fa-triangle-exclamation me-1"></i>>80 Limit</span>
+                                }
+                            }
+                        </td>
                         <td class="fw-bold">@g.Programme?.Name (@g.Programme?.Code)</td>
                         <td><span class="badge bg-secondary">Level @((int)g.Level)</span></td>
-                        <td><span class="badge bg-dark">@g.StudentCount Students</span></td>
-                        <td><span class="badge bg-info">@g.Students.Count Enrolled</span></td>
+                        <td><span class="badge bg-dark fs-6">@g.StudentCount Students</span></td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editGroup(@g.Id, '@g.Name', @g.ProgrammeId, @((int)g.Level), @g.StudentCount)">
+                            @if (g.StudentCount > 80)
+                            {
+                                if (g.IgnoreSplit)
+                                {
+                                    <form action="/Admin/StudentGroup/ToggleIgnoreSplit" method="post" class="d-inline">
+                                        <input type="hidden" name="id" value="@g.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary me-1" title="Re-enable >80 Auto-Split rule for this group">
+                                            <i class="fa-solid fa-eye me-1"></i>Unignore
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form action="/Admin/StudentGroup/AutoSplit" method="post" class="d-inline" onsubmit="return confirm('Split this group into two equal groups (Group A and Group B)?');">
+                                        <input type="hidden" name="id" value="@g.Id" />
+                                        <button type="submit" class="btn btn-sm btn-warning text-dark me-1" title="Group exceeds 80 students - Auto Split into 2 groups">
+                                            <i class="fa-solid fa-scissors me-1"></i>Auto-Split
+                                        </button>
+                                    </form>
+                                    <form action="/Admin/StudentGroup/ToggleIgnoreSplit" method="post" class="d-inline">
+                                        <input type="hidden" name="id" value="@g.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary me-1" title="Ignore >80 auto-split for this group">
+                                            <i class="fa-solid fa-eye-slash me-1"></i>Ignore
+                                        </button>
+                                    </form>
+                                }
+                            }
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editGroup(@g.Id, '@g.Name', @g.ProgrammeId, @((int)g.Level), @g.StudentCount, @(g.IgnoreSplit ? "true" : "false"))">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                             <form action="/Admin/StudentGroup/Delete" method="post" class="d-inline" onsubmit="return confirm('Delete this student group?');">
@@ -127,8 +142,12 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Target Student Count</label>
+                        <label class="form-label fw-semibold">Total Number of Students</label>
                         <input type="number" name="StudentCount" class="form-control" value="60" required />
+                    </div>
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="IgnoreSplit" value="true" class="form-check-input" id="createIgnore" />
+                        <label class="form-check-label fw-semibold text-muted" for="createIgnore">Keep as single group (Ignore >80 auto-split)</label>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -171,8 +190,12 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Target Student Count</label>
+                        <label class="form-label fw-semibold">Total Number of Students</label>
                         <input type="number" name="StudentCount" id="editCount" class="form-control" required />
+                    </div>
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="IgnoreSplit" value="true" class="form-check-input" id="editIgnore" />
+                        <label class="form-check-label fw-semibold text-muted" for="editIgnore">Keep as single group (Ignore >80 auto-split)</label>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -184,42 +207,15 @@
     </div>
 </div>
 
-<!-- Import Modal -->
-<div class="modal fade" id="importModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form action="/Admin/StudentGroup/ImportCsv" method="post" enctype="multipart/form-data">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-file-csv me-2"></i>Import Student Roster CSV</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small">Select a CSV file containing student index numbers, full names, emails, programme codes, and level. The AI engine will automatically analyze roster sizes and recommend group divisions.</p>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">CSV File</label>
-                        <input type="file" name="csvFile" class="form-control" accept=".csv" required />
-                    </div>
-                    <div class="alert alert-info small mb-0">
-                        <i class="fa-solid fa-circle-info me-1"></i>Expected Columns: <code>IndexNumber, FullName, Email, ProgrammeCode, Level</code>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success fw-semibold">Upload & Analyze</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
 @section Scripts {
     <script>
-        function editGroup(id, name, progId, level, count) {
+        function editGroup(id, name, progId, level, count, ignoreSplit) {
             $('#editId').val(id);
             $('#editName').val(name);
             $('#editProgId').val(progId);
             $('#editLevel').val(level);
             $('#editCount').val(count);
+            $('#editIgnore').prop('checked', ignoreSplit);
             new bootstrap.Modal(document.getElementById('editModal')).show();
         }
     </script>

@@ -106,5 +106,42 @@ namespace UniversityTimetable.Web.Controllers
             string html = _exportService.GeneratePrintableHtml(publishedTimetable ?? new Timetable(), $"Personal Schedule - {student?.FullName ?? "Student"}");
             return Content(html, "text/html");
         }
+
+        [HttpGet("ExportExcel")]
+        public async Task<IActionResult> ExportExcel()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            int studentId = user?.AssociatedStudentId ?? 1;
+
+            var student = await _context.Students.Include(s => s.Programme).FirstOrDefaultAsync(s => s.Id == studentId);
+
+            var publishedTimetable = await _context.Timetables
+                .Include(t => t.AcademicYear)
+                .Include(t => t.Semester)
+                .Include(t => t.Entries).ThenInclude(e => e.Course).ThenInclude(c => c!.Department)
+                .Include(t => t.Entries).ThenInclude(e => e.Lecturer)
+                .Include(t => t.Entries).ThenInclude(e => e.Classroom)
+                .Include(t => t.Entries).ThenInclude(e => e.StudentGroup)
+                .Where(t => t.Status == TimetableStatus.Published || t.Status == TimetableStatus.Validated)
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (publishedTimetable != null && student != null)
+            {
+                var filteredEntries = publishedTimetable.Entries
+                    .Where(e => e.Course != null &&
+                                e.Course.ProgrammeId == student.ProgrammeId &&
+                                e.Course.Level == student.Level &&
+                                (e.StudentGroupId == null || e.StudentGroupId == student.StudentGroupId))
+                    .ToList();
+
+                publishedTimetable.Entries = filteredEntries;
+            }
+
+            string deptName = student?.Programme?.Name ?? "DEPARTMENT OF COMPUTER SCIENCE & ACADEMICS";
+            byte[] excelData = _exportService.ExportTimetableToExcel(publishedTimetable ?? new Timetable(), "UNIVERSITY OF GHANA", deptName);
+
+            return File(excelData, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Student_Personal_Timetable.xlsx");
+        }
     }
 }

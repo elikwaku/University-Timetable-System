@@ -13,12 +13,10 @@ namespace UniversityTimetable.Web.Controllers
     public class StudentGroupController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly StudentCsvImporter _csvImporter;
 
-        public StudentGroupController(ApplicationDbContext context, StudentCsvImporter csvImporter)
+        public StudentGroupController(ApplicationDbContext context)
         {
             _context = context;
-            _csvImporter = csvImporter;
         }
 
         [HttpGet("")]
@@ -28,7 +26,6 @@ namespace UniversityTimetable.Web.Controllers
             ViewBag.Programmes = await _context.Programmes.ToListAsync();
             var groups = await _context.StudentGroups
                 .Include(g => g.Programme)
-                .Include(g => g.Students)
                 .ToListAsync();
             return View("~/Views/StudentGroup/Index.cshtml", groups);
         }
@@ -36,9 +33,89 @@ namespace UniversityTimetable.Web.Controllers
         [HttpPost("Create")]
         public async Task<IActionResult> Create(StudentGroup group)
         {
-            _context.StudentGroups.Add(group);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = $"Student Group '{group.Name}' created successfully.";
+            if (group.StudentCount > 80 && !group.IgnoreSplit)
+            {
+                int half = group.StudentCount / 2;
+                int rem = group.StudentCount - half;
+
+                var grpA = new StudentGroup
+                {
+                    Name = $"{group.Name} (Group A)",
+                    ProgrammeId = group.ProgrammeId,
+                    Level = group.Level,
+                    StudentCount = half,
+                    CreatedAt = System.DateTime.UtcNow
+                };
+
+                var grpB = new StudentGroup
+                {
+                    Name = $"{group.Name} (Group B)",
+                    ProgrammeId = group.ProgrammeId,
+                    Level = group.Level,
+                    StudentCount = rem,
+                    CreatedAt = System.DateTime.UtcNow
+                };
+
+                _context.StudentGroups.AddRange(grpA, grpB);
+                await _context.SaveChangesAsync();
+                TempData["Success"] = $"Student Count ({group.StudentCount}) exceeds 80. Automatically split into '{grpA.Name}' ({half}) and '{grpB.Name}' ({rem}).";
+            }
+            else
+            {
+                _context.StudentGroups.Add(group);
+                await _context.SaveChangesAsync();
+                TempData["Success"] = $"Student Group '{group.Name}' created successfully.";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost("AutoSplit")]
+        public async Task<IActionResult> AutoSplit(int id)
+        {
+            var existing = await _context.StudentGroups.FindAsync(id);
+            if (existing != null && existing.StudentCount > 80)
+            {
+                int half = existing.StudentCount / 2;
+                int rem = existing.StudentCount - half;
+
+                string baseName = existing.Name.Replace(" (Group A)", "").Replace(" (Group B)", "").Trim();
+
+                existing.Name = $"{baseName} (Group A)";
+                existing.StudentCount = half;
+                existing.IgnoreSplit = false;
+                existing.UpdatedAt = System.DateTime.UtcNow;
+
+                var grpB = new StudentGroup
+                {
+                    Name = $"{baseName} (Group B)",
+                    ProgrammeId = existing.ProgrammeId,
+                    Level = existing.Level,
+                    StudentCount = rem,
+                    IgnoreSplit = false,
+                    CreatedAt = System.DateTime.UtcNow
+                };
+
+                _context.StudentGroups.Add(grpB);
+                await _context.SaveChangesAsync();
+                TempData["Success"] = $"Group split into 2 groups: '{existing.Name}' ({half} students) and '{grpB.Name}' ({rem} students). Both will have equal weekly lecturer meeting times and course contact hours.";
+            }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost("ToggleIgnoreSplit")]
+        public async Task<IActionResult> ToggleIgnoreSplit(int id)
+        {
+            var existing = await _context.StudentGroups.FindAsync(id);
+            if (existing != null)
+            {
+                existing.IgnoreSplit = !existing.IgnoreSplit;
+                existing.UpdatedAt = System.DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                TempData["Success"] = existing.IgnoreSplit
+                    ? $"Group '{existing.Name}' set to ignore >80 auto-split."
+                    : $"Group '{existing.Name}' auto-split rule re-enabled.";
+            }
             return RedirectToAction(nameof(Index));
         }
 
@@ -52,6 +129,7 @@ namespace UniversityTimetable.Web.Controllers
                 existing.ProgrammeId = group.ProgrammeId;
                 existing.Level = group.Level;
                 existing.StudentCount = group.StudentCount;
+                existing.IgnoreSplit = group.IgnoreSplit;
                 existing.UpdatedAt = System.DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
@@ -72,31 +150,6 @@ namespace UniversityTimetable.Web.Controllers
                 TempData["Success"] = "Student Group deleted successfully.";
             }
             return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost("ImportCsv")]
-        public async Task<IActionResult> ImportCsv(IFormFile csvFile)
-        {
-            if (csvFile == null || csvFile.Length == 0)
-            {
-                TempData["Error"] = "Please select a valid CSV file.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            using (var stream = csvFile.OpenReadStream())
-            {
-                var result = await _csvImporter.ImportStudentsFromCsvAsync(stream, async code =>
-                {
-                    return await _context.Programmes.FirstOrDefaultAsync(p => p.Code == code);
-                });
-
-                TempData["Success"] = $"Successfully parsed {result.TotalImported} student records across {result.GroupSuggestions.Count} programme groups.";
-                ViewBag.ImportSuggestions = result.GroupSuggestions;
-            }
-
-            var groups = await _context.StudentGroups.Include(g => g.Programme).Include(g => g.Students).ToListAsync();
-            ViewBag.Programmes = await _context.Programmes.ToListAsync();
-            return View("~/Views/StudentGroup/Index.cshtml", groups);
         }
     }
 }
